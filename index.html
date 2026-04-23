@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab Havoc</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0d1117;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif;
+      color: #e6edf3;
+    }
+
+    h1 {
+      font-size: 22px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #39d353;
+      text-shadow: 0 0 18px rgba(57,211,83,0.45);
+      margin-bottom: 10px;
+    }
+
+    #game-wrap {
+      position: relative;
+      width: 960px;
+      height: 600px;
+      background: #000;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 0 40px rgba(57,211,83,0.1);
+    }
+
+    canvas#unity-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Loading overlay */
+    #loading {
+      position: absolute;
+      inset: 0;
+      background: #0d1117;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      z-index: 10;
+      transition: opacity 0.6s ease;
+    }
+    #loading.fade-out { opacity: 0; pointer-events: none; }
+
+    .load-title {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: 6px;
+      color: #39d353;
+      text-shadow: 0 0 24px rgba(57,211,83,0.6);
+    }
+    .load-sub {
+      font-size: 12px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #8b949e;
+    }
+
+    #bar-track {
+      width: 320px;
+      height: 4px;
+      background: #21262d;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    #bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #39d353, #a5f3b0);
+      border-radius: 2px;
+      transition: width 0.25s ease;
+    }
+
+    #load-status {
+      font-size: 12px;
+      color: #8b949e;
+      letter-spacing: 1px;
+      height: 16px;
+    }
+
+    /* Error overlay */
+    #error-box {
+      position: absolute;
+      inset: 0;
+      background: rgba(13,17,23,0.95);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      z-index: 20;
+      padding: 24px;
+      text-align: center;
+    }
+    #error-box.show { display: flex; }
+    #error-title { font-size: 18px; color: #f85149; }
+    #error-detail { font-size: 13px; color: #8b949e; max-width: 520px; line-height: 1.6; }
+
+    /* Toolbar */
+    #toolbar {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    button {
+      padding: 5px 14px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 5px;
+      color: #c9d1d9;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover { background: #30363d; }
+  </style>
+</head>
+<body>
+
+<h1>Lab Havoc</h1>
+
+<div id="game-wrap">
+  <canvas id="unity-canvas" tabindex="-1"></canvas>
+
+  <div id="loading">
+    <div class="load-title">LAB HAVOC</div>
+    <div class="load-sub">Loading…</div>
+    <div id="bar-track"><div id="bar-fill"></div></div>
+    <div id="load-status">Initializing engine</div>
+  </div>
+
+  <div id="error-box">
+    <div id="error-title">⚠ Failed to Load</div>
+    <div id="error-detail"></div>
+  </div>
+</div>
+
+<div id="toolbar">
+  <button onclick="toggleFullscreen()">⛶ Fullscreen</button>
+</div>
+
+<script src="build/lab-havoc-v26042210_loader.js"></script>
+<script>
+  const canvas  = document.getElementById("unity-canvas");
+  const loading = document.getElementById("loading");
+  const barFill = document.getElementById("bar-fill");
+  const status  = document.getElementById("load-status");
+  const errBox  = document.getElementById("error-box");
+  const errDetail = document.getElementById("error-detail");
+
+  function showError(msg) {
+    errDetail.textContent = msg;
+    errBox.classList.add("show");
+    loading.classList.add("fade-out");
+  }
+
+  function onProgress(p) {
+    const pct = Math.round(p * 100);
+    barFill.style.width = pct + "%";
+    if      (p < 0.1) status.textContent = "Initializing engine";
+    else if (p < 0.4) status.textContent = "Downloading assets";
+    else if (p < 0.7) status.textContent = "Compiling shaders";
+    else if (p < 0.95) status.textContent = "Starting game";
+    else               status.textContent = "Ready";
+  }
+
+  createUnityInstance(canvas, {
+    dataUrl:            "build/lab-havoc-v26042210.data.unityweb",
+    frameworkUrl:       "build/lab-havoc-v26042210_framework_js.unityweb",
+    codeUrl:            "build/lab-havoc-v26042210_wasm.unityweb",
+    streamingAssetsUrl: "StreamingAssets",
+    companyName:        "DefaultCompany",
+    productName:        "LabHavoc",
+    productVersion:     "1.0",
+    showBanner: function(msg, type) {
+      if (type === "error") showError(msg);
+      else console.warn("[Unity]", msg);
+    }
+  }, onProgress).then(function(instance) {
+    loading.classList.add("fade-out");
+    canvas.focus();
+  }).catch(function(err) {
+    showError(err || "Unknown error — check the browser console for details.");
+  });
+
+  function toggleFullscreen() {
+    const wrap = document.getElementById("game-wrap");
+    if (!document.fullscreenElement) wrap.requestFullscreen();
+    else document.exitFullscreen();
+  }
+</script>
+
+</body>
+</html>
